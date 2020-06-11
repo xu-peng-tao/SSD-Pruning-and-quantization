@@ -1,4 +1,4 @@
-#SSD-Pruning and quantification
+# SSD-Pruning and quantification
 
 1，在SSD上实现模型压缩：剪枝和量化
 
@@ -7,10 +7,10 @@
 3，SSD源码来自于[lufficc/SSD](https://github.com/lufficc/SSD),剪枝方法参考[SpursLipu /YOLOv3-ModelCompression-MultidatasetTraining-Multibackbone](https://github.com/SpursLipu/YOLOv3-ModelCompression-MultidatasetTraining-Multibackbone),
 量化方法参考[666DZY666/model-compression](https://github.com/666DZY666/model-compression) ,在此致谢。
 
-##Dataset
-###COCO
+## Dataset
+### COCO
 Microsoft COCO: Common Objects in Context
-####Download COCO 2014
+#### Download COCO 2014
 ```Shell
 sh ssd/data/datasets/scripts/COCO2014.sh
 ```
@@ -26,15 +26,15 @@ sh ssd/data/datasets/scripts/VOC2012.sh
 ```
 ### oxford hand
 原始数据集可由[官网](http://www.robots.ox.ac.uk/~vgg/data/hands)下载,本项目将数据集格式进行转化。转换格式的数据集可在[百度网盘]()下载。下载解压后得到images和labels两个文件夹，然后configs/oxfordhand.data中的对应路径更换成解压后文件的路径即可。
-###For more dataset
+### For more dataset
 可以将新的数据集变为oxford hand数据集格式，建立对应的.names和.data文件即可。
 
 
-##Backbone
+## Backbone
 原始[lufficc/SSD](https://github.com/lufficc/SSD)中有多backbone的实现，本代码依然兼容。这里为便于扩展新的backbone和便于模型剪枝，采用[ultralytics/yolov3](https://github.com/ultralytics/yolov3)中cfg文件的形式定义backbone。目前支持vgg16-BN、vgg-BN-fpga、mobilenet_v2,可以添加新的cfg文件以支持更多的backbone(若有新的结构，需要在ssd/modeling/backbone/backbone_cfg.py中进行添加定义)。当定义了新的cfg文件，可定义对应的yaml文件，使用test_model_structure.py打印模型结构、使用get_model_size得到模型规模。
 
 
-##Train
+## Train
 ```
 one gpu:
 CUDA_VISIBLE_DEVICES="2" python train.py --config-file configs/*.yaml
@@ -43,16 +43,16 @@ export NGPUS=2
 CUDA_VISIBLE_DEVICES="2,3" python -m torch.distributed.launch --nproc_per_node=$NGPUS train.py --config-file configs/*.yaml SOLVER.WARMUP_FACTOR 0.03333 SOLVER.WARMUP_ITERS 1000 
 ```
 
-##Evaluate 
+## Evaluate 
 ```
 CUDA_VISIBLE_DEVICES="2" python test.py --config-file configs/*.yaml
 ```
-##Demo
+## Demo
 ```
 CUDA_VISIBLE_DEVICES="2" python demo.py --config-file configs/*.yaml --ckpt /path_to/*.pth --dataset_type oxfordhand --score_threshold 0.4
 ```
 
-##Prune
+## Prune
 剪枝方法来源于论文[Learning Efficient Convolutional Networks through Network Slimming](https://arxiv.org/abs/1708.06519)，剪枝无需微调方法来源于[Rethinking the Smaller-Norm-Less-Informative Assumption in Channel Pruning of Convolution Layers](https://arxiv.org/abs/1802.00124?context=cs)。
 
 剪枝分为3步：
@@ -80,10 +80,10 @@ CUDA_VISIBLE_DEVICES="2,3" python -m torch.distributed.launch --nproc_per_node=$
 CUDA_VISIBLE_DEVICES="3" python prune.py --config-file configs/*_sparse.yaml --regular 0 --max 0 --percent 0.1 --model model_final.pth
 ```
 
-##Quantification
+## Quantification
 TODO......
 
-##Experiment
+## Experiment
 部分实验训练、测试等具体命令可见[experiment.md](experiment.md)。部分实验结果可见[result.md](result.md)。
 
 
