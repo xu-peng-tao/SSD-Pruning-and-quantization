@@ -1,0 +1,6 @@
+classes= 1
+train= dataset/hand/train.txt
+valid= dataset/hand/valid.txt
+images= /home/xpt/data/hand_dataset/images/
+labels= /home/xpt/data/hand_dataset/labels/
+names= configs/oxfordhand.names

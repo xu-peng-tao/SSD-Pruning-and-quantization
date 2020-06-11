@@ -1,0 +1,21 @@
+MODEL:
+  NUM_CLASSES: 2          #background,hand
+  BACKBONE:
+    NAME: 'cfg_backbone'
+    PRETRAINED: True
+    WEIGHTS: 'pretrained/vgg_bn_ssd300_voc0712_model_final.pth'
+    CFG: 'configs/vgg_bn_ssd300.cfg'
+INPUT:
+  IMAGE_SIZE: 300
+DATASETS:
+  TRAIN: ("oxfordhand",)       #名称与oxfordhand.data  .names  名称必须相同
+  TEST: ("oxfordhand", )
+SOLVER:
+  MAX_ITER: 55000
+  LR_STEPS: [20000,40000, 50000]
+  GAMMA: 0.1
+  BATCH_SIZE: 32
+  LR: 1e-3
+
+
+OUTPUT_DIR: 'outputs/vgg_bn_ssd300_hand'

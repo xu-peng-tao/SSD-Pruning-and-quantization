@@ -1,0 +1,33 @@
+MODEL:
+  NUM_CLASSES: 2
+  BOX_HEAD:
+    PREDICTOR: 'SSDLiteBoxPredictor'
+  BACKBONE:
+    NAME: 'cfg_backbone'
+    OUT_CHANNELS: (96, 1280, 512, 256, 256, 64)
+    CFG: 'configs/mobilenet_v2_ssd.cfg'
+    PRETRAINED: True
+    WEIGHTS: 'pretrained/mobile_v2_ssd_voc0712_0.7066.pth'
+  PRIORS:
+    FEATURE_MAPS: [20, 10, 5, 3, 2, 1]
+    STRIDES: [16, 32, 64, 107, 160, 320]
+    MIN_SIZES: [60, 105, 150, 195, 240, 285]
+    MAX_SIZES: [105, 150, 195, 240, 285, 330]
+    ASPECT_RATIOS: [[2, 3], [2, 3], [2, 3], [2, 3], [2, 3], [2, 3]]
+    BOXES_PER_LOCATION: [6, 6, 6, 6, 6, 6]
+INPUT:
+  IMAGE_SIZE: 320
+DATASETS:
+  TRAIN: ("oxfordhand",)
+  TEST: ("oxfordhand", )
+PRUNE:
+  TYPE: 'shortcut'
+  SR: 0.001
+SOLVER:
+  MAX_ITER: 30000
+  LR_STEPS: [10000,20000,25000]
+  GAMMA: 0.1
+  BATCH_SIZE: 32
+  LR: 0.002324
+
+OUTPUT_DIR: 'outputs/mobile_v2_ssd_hand_shortcut_sparse'
