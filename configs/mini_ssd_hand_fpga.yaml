@@ -1,0 +1,36 @@
+MODEL:
+  NUM_CLASSES: 2
+  BACKBONE:
+    NAME: 'cfg_backbone'
+    PRETRAINED: False
+    CFG: 'configs/mini_ssd_hand_fpga.cfg'
+    OUT_CHANNELS: (128,)
+  PRIORS:
+    FEATURE_MAPS: [52]
+    STRIDES: [8]
+    MIN_SIZES : [30]
+    MAX_SIZES : [60]
+    ASPECT_RATIOS : [ [2]]
+    BOXES_PER_LOCATION : [4]
+INPUT:
+  IMAGE_SIZE: 416
+DATASETS:
+  TRAIN: ("oxfordhand",)
+  TEST: ("oxfordhand", )
+SOLVER:
+  MAX_ITER: 40000
+  LR_STEPS: [15000,35000,37500]
+  GAMMA: 0.1
+  BATCH_SIZE: 32
+  LR: 0.002324
+
+
+OUTPUT_DIR: 'outputs/mini_ssd_hand_fpga'
+
+#mAP:46.96
+#export NGPUS=2
+#CUDA_VISIBLE_DEVICES="2,3" python -m torch.distributed.launch --nproc_per_node=$NGPUS train.py --config-file configs/mini_ssd_hand_fpga.yaml SOLVER.WARMUP_FACTOR 0.03333 SOLVER.WARMUP_ITERS 1000
+#CUDA_VISIBLE_DEVICES="2" python train.py --config-file configs/mini_ssd_hand_fpga.yaml
+#CUDA_VISIBLE_DEVICES="2" python test.py --config-file configs/mini_ssd_hand_fpga.yaml --ckpt outputs/mini_ssd_hand_fpga/model_final.pth TEST.BN_FUSE True
+#CUDA_VISIBLE_DEVICES="2" python demo.py --config-file configs/mini_ssd_hand_fpga.yaml --images_dir demo --ckpt outputs/mini_ssd_hand_fpga/model_final.pth --dataset_type oxfordhand --score_threshold 0.24 TEST.BN_FUSE True
+#python get_weights_bin.py --config-file configs/mini_ssd_hand_fpga.yaml --ckpt model_final.pth TEST.BN_FUSE True

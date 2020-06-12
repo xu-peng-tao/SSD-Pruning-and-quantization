@@ -1,0 +1,20 @@
+MODEL:
+  NUM_CLASSES: 21
+  BACKBONE:
+    NAME: 'cfg_backbone'
+    PRETRAINED: True
+    WEIGHTS: 'pretrained/vgg16_bn_reducefc.pth'
+    CFG: 'configs/vgg_bn_ssd300_fpga.cfg'
+INPUT:
+  IMAGE_SIZE: 300
+
+DATASETS:
+  TRAIN: ("voc_2007_trainval", "voc_2012_trainval")
+  TEST: ("voc_2007_test", )
+SOLVER:
+  MAX_ITER: 80000
+  LR_STEPS: [30000,60000, 75000]  #gpu=2  40080--->20040
+  GAMMA: 0.1
+  BATCH_SIZE: 32
+  LR: 1e-3
+OUTPUT_DIR: 'outputs/vgg_bn_ssd300_voc0712_fpga'

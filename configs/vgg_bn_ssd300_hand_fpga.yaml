@@ -1,0 +1,40 @@
+MODEL:
+  NUM_CLASSES: 2
+  BACKBONE:
+    NAME: 'cfg_backbone'
+    PRETRAINED: True
+    WEIGHTS: 'pretrained/vgg_bn_ssd300_voc0712_fpga_model_final.pth'
+    CFG: 'configs/vgg_bn_ssd300_fpga.cfg'
+INPUT:
+  IMAGE_SIZE: 300
+DATASETS:
+  TRAIN: ("oxfordhand",)
+  TEST: ("oxfordhand", )
+SOLVER:
+  MAX_ITER: 55000
+  LR_STEPS: [20000,40000, 50000]  #gpu=2  40080--->20040
+  GAMMA: 0.1
+  BATCH_SIZE: 32
+  LR: 1e-3
+
+
+OUTPUT_DIR: 'outputs/vgg_bn_ssd300_hand_fpga'
+
+
+###hand(vgg_bn fpga) use_07_metric=False
+####train/resume
+#```
+#one_gpu:
+#CUDA_VISIBLE_DEVICES="2" python train.py --config-file configs/vgg_bn_ssd300_hand_fpga.yaml
+#two_gpu:
+#export NGPUS=2
+#CUDA_VISIBLE_DEVICES="2,3" python -m torch.distributed.launch --nproc_per_node=$NGPUS train.py --config-file configs/vgg_bn_ssd300_hand_fpga.yaml SOLVER.WARMUP_FACTOR 0.03333 SOLVER.WARMUP_ITERS 1000
+#four_gpu:
+#export NGPUS=4
+#python -m torch.distributed.launch --nproc_per_node=$NGPUS train.py --config-file configs/vgg_bn_ssd300_hand_fpga.yaml SOLVER.WARMUP_FACTOR 0.03333 SOLVER.WARMUP_ITERS 1000
+#```
+####evaluate(one gpu)
+#```
+#CUDA_VISIBLE_DEVICES="2" python test.py --config-file configs/vgg_bn_ssd300_hand_fpga.yaml TEST.BN_FUSE True
+#```
+#mAP: 76.71

@@ -18,7 +18,7 @@ from ssd.utils.checkpoint import CheckPointer
 
 
 @torch.no_grad()
-def run_demo(cfg, ckpt, score_threshold, images_dir, output_dir, dataset_type):
+def run_demo(cfg, ckpt, score_threshold, images_dir, output_dir, dataset_type,model_path=None):
     if dataset_type == "voc":
         class_names = VOCDataset.class_names
     elif dataset_type == 'coco':
@@ -33,10 +33,18 @@ def run_demo(cfg, ckpt, score_threshold, images_dir, output_dir, dataset_type):
     model = model.to(device)
     checkpointer = CheckPointer(model, save_dir=cfg.OUTPUT_DIR)
     checkpointer.load(ckpt, use_latest=ckpt is None)
-    weight_file = ckpt if ckpt else checkpointer.get_checkpoint_file()
-    print('Loaded weights from {}'.format(weight_file))
+    if model_path is None:
+        checkpointer.load(ckpt, use_latest=ckpt is None)
+        weight_file = ckpt if ckpt else checkpointer.get_checkpoint_file()
+        print('Loaded weights from {}'.format(weight_file))
+    else:
+        model.load_state_dict(torch.load(model_path))
 
-    image_paths = glob.glob(os.path.join(images_dir, '*.jpg'))
+    if cfg.TEST.BN_FUSE is True:
+        print('BN_FUSE.')
+        model.backbone.bn_fuse()
+        model.to(device)
+    image_paths = glob.glob(os.path.join(images_dir, '*.jpg'))  #.png
     mkdir(output_dir)
 
     cpu_device = torch.device("cpu")
@@ -85,6 +93,7 @@ def main():
         help="path to config file",
         type=str,
     )
+    parser.add_argument("--model_path", type=str, default=None, help="Trained weights.")
     parser.add_argument("--ckpt", type=str, default=None, help="Trained weights.")
     parser.add_argument("--score_threshold", type=float, default=0.7)
     parser.add_argument("--images_dir", default='demo', type=str, help='Specify a image dir to do prediction.')
@@ -115,7 +124,8 @@ def main():
              score_threshold=args.score_threshold,
              images_dir=args.images_dir,
              output_dir=args.output_dir,
-             dataset_type=args.dataset_type)
+             dataset_type=args.dataset_type,
+             model_path=args.model_path)
 
 
 if __name__ == '__main__':

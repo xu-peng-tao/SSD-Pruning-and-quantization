@@ -1,0 +1,48 @@
+MODEL:
+  NUM_CLASSES: 2
+  BACKBONE:
+    NAME: 'cfg_backbone'
+    PRETRAINED: False
+    CFG: '/configs/vgg_bn_ssd300_fpga.cfg'
+  FINE_TUNE: True
+  WEIGHTS: '/home/xpt/SSD-e/outputs/vgg_bn_ssd300_hand_fpga/model_final.pth'#之前非稀疏化的权重
+INPUT:
+  IMAGE_SIZE: 300
+DATASETS:
+  TRAIN: ("oxfordhand",)
+  TEST: ("oxfordhand", )
+SOLVER:
+  MAX_ITER: 150000               #稀疏化需要长时间长轮数才能得到效果
+  LR_STEPS: [60000,100000,130000]  #gpu=2  40080--->20040
+  GAMMA: 0.1
+  BATCH_SIZE: 32
+  LR: 0.002324
+PRUNE:
+  TYPE: 'normal'
+  SR: 0.001
+OUTPUT_DIR: 'outputs/vgg_bn_ssd300_hand_fpga_sparse'
+
+
+
+###hand(vgg_bn fpga) use_07_metric=False  sparse training
+####train/resume
+#```
+#one_gpu:
+#CUDA_VISIBLE_DEVICES="2" python train.py --config-file configs/vgg_bn_ssd300_hand_fpga_sparse.yaml
+#two_gpu:
+#export NGPUS=2
+#CUDA_VISIBLE_DEVICES="2,3" python -m torch.distributed.launch --nproc_per_node=$NGPUS train.py --config-file configs/vgg_bn_ssd300_hand_fpga_sparse.yaml SOLVER.WARMUP_FACTOR 0.03333 SOLVER.WARMUP_ITERS 1000
+#four_gpu:
+#export NGPUS=4
+#python -m torch.distributed.launch --nproc_per_node=$NGPUS train.py --config-file configs/vgg_bn_ssd300_hand_fpga_sparse.yaml SOLVER.WARMUP_FACTOR 0.03333 SOLVER.WARMUP_ITERS 1000
+#```
+####evaluate(one gpu)
+#```
+#CUDA_VISIBLE_DEVICES="2" python test.py --config-file configs/vgg_bn_ssd300_hand_fpga_sparse.yaml TEST.BN_FUSE True
+#```
+####normal_prune
+#```
+#CUDA_VISIBLE_DEVICES="3" python prune.py --config-file configs/vgg_bn_ssd300_hand_fpga_sparse.yaml --quick 0 --percent 0.63 --model model_final.pth --regular 0 --max 1
+#```
+
+

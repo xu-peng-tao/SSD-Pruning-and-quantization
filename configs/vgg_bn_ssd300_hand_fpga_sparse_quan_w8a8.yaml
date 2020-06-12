@@ -1,0 +1,55 @@
+MODEL:
+  NUM_CLASSES: 2
+  BACKBONE:
+    NAME: 'cfg_backbone'
+    PRETRAINED: True
+    WEIGHTS: '/home/xpt/SSD-e/outputs/vgg_bn_ssd300_hand_fpga_sparse/model_final.pth' #78.20  之前全精度的权重
+    CFG: 'configs/vgg_bn_ssd300_fpga_quan.cfg'
+INPUT:
+  IMAGE_SIZE: 300
+DATASETS:
+  TRAIN: ("oxfordhand",)
+  TEST: ("oxfordhand", )
+SOLVER:
+  MAX_ITER: 40000
+  LR_STEPS: [20000,30000,35000]  #gpu=2  40080--->20040
+  GAMMA: 0.1
+  BATCH_SIZE: 20
+  LR: 0.002324
+PRUNE:
+  TYPE: 'normal'
+  SR: 0.001
+QUANTIZATION:
+  TYPE: 'dorefa'
+  FINAL: False
+#  FINAL: True   #最后预测层是否量化
+  WBITS: 8
+  ABITS: 8
+#默认16位量化
+OUTPUT_DIR: 'outputs/vgg_bn_ssd300_hand_fpga_sparse_quan_w8a8'
+
+
+
+####train/resume
+#```
+#one_gpu:
+#CUDA_VISIBLE_DEVICES="2" python train.py --config-file configs/vgg_bn_ssd300_hand_fpga_sparse_quan_w8a8.yaml
+#two_gpu:
+#export NGPUS=2
+#CUDA_VISIBLE_DEVICES="2,3" python -m torch.distributed.launch --nproc_per_node=$NGPUS train.py --config-file configs/vgg_bn_ssd300_hand_fpga__sparse_quan_w8a8.yaml SOLVER.WARMUP_FACTOR 0.03333 SOLVER.WARMUP_ITERS 1000
+#four_gpu:
+#export NGPUS=4
+#python -m torch.distributed.launch --nproc_per_node=$NGPUS train.py --config-file configs/vgg_bn_ssd300_hand_fpga__sparse_quan_w8a8.yaml SOLVER.WARMUP_FACTOR 0.03333 SOLVER.WARMUP_ITERS 1000
+#```
+####evaluate(one gpu)
+#```78.68
+#CUDA_VISIBLE_DEVICES="2" python test.py --config-file configs/vgg_bn_ssd300_hand_fpga_sparse_quan_w8a8.yaml --ckpt outputs/vgg_bn_ssd300_hand_fpga_sparse_quan_w8a8_1/model_final.pth TEST.BN_FUSE False
+#```
+####prune
+#```
+#CUDA_VISIBLE_DEVICES="0" python prune.py --config-file configs/vgg_bn_ssd300_hand_fpga_sparse_quan_w8a8.yaml --quick 0 --percent 0.66 --model model_final.pth --regular 1 --max 1
+#```
+
+
+
+

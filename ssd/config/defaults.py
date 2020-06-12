@@ -97,13 +97,22 @@ _C.TEST.CONFIDENCE_THRESHOLD = 0.01
 _C.TEST.MAX_PER_CLASS = -1
 _C.TEST.MAX_PER_IMAGE = 100
 _C.TEST.BATCH_SIZE = 10
-
+_C.TEST.BN_FUSE= False
 # ---------------------------------------------------------------------------- #
 #prune options
 # ---------------------------------------------------------------------------- #
 _C.PRUNE = CN()
 _C.PRUNE.TYPE= 'no'
 _C.PRUNE.SR= 0.001       #scale sparse rate         sparsity-regularization
+
+# ---------------------------------------------------------------------------- #
+#quantization options
+# ---------------------------------------------------------------------------- #
+_C.QUANTIZATION = CN()
+_C.QUANTIZATION.TYPE= 'no'
+_C.QUANTIZATION.WBITS= 16
+_C.QUANTIZATION.ABITS= 16
+_C.QUANTIZATION.FINAL= False #predict head是否量化
 
 
 _C.OUTPUT_DIR = 'outputs'

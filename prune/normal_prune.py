@@ -9,6 +9,9 @@ from ssd.engine.inference import do_evaluation
 from prune.prune_utils import *
 from get_model_size import model_size
 from terminaltables import AsciiTable
+import quantization.WqAq.dorefa.models.util_wqaq as dorefa
+import quantization.WqAq.IAO.models.util_wqaq as IAO
+import quantization.WbWtAb.models.util_wt_bab as BWN
 filter_switch = [8, 16, 32, 64, 128, 256, 512, 1024]  #规整通道数
 def parse_module_defs(module_defs):
     CBL_idx = []
@@ -164,9 +167,9 @@ def prune_model_keep_size(cfg,model, prune_idx, CBL_idx, CBLidx2mask,Conv_idx):
     pruned_model = deepcopy(model)
     backbone=pruned_model.backbone
     predictor=pruned_model.box_head.predictor
-    # if cfg.QUANTIZATION.TYPE== 'dorefa':
-    #     quan_w=dorefa.weight_quantize(w_bits=cfg.QUANTIZATION.WBITS)
-    #     quan_a=dorefa.activation_quantize(a_bits=cfg.QUANTIZATION.ABITS)
+    if cfg.QUANTIZATION.TYPE== 'dorefa':
+        quan_w=dorefa.weight_quantize(w_bits=cfg.QUANTIZATION.WBITS)
+        quan_a=dorefa.activation_quantize(a_bits=cfg.QUANTIZATION.ABITS)
     for idx in prune_idx:
         mask = torch.from_numpy(CBLidx2mask[idx]).cuda()
         bn_module = backbone.module_list[idx][1]
@@ -184,9 +187,9 @@ def prune_model_keep_size(cfg,model, prune_idx, CBL_idx, CBLidx2mask,Conv_idx):
                 activation=(1 - mask) * bn_bias
             else:
                 activation = activate((1 - mask) * bn_bias)  # 先过激活，再过量化（如果有），（1-mask)--->被剪掉的为1---》未剪掉的为0，得保证0量化为0
-            # if backbone.module_defs[next_idx]['quantization'] == '1':
-            #     activation=quan_a(activation)
-            #     next_conv_weight=quan_w(next_conv_weight)
+            if backbone.module_defs[next_idx]['quantization'] == '1':
+                activation=quan_a(activation)
+                next_conv_weight=quan_w(next_conv_weight)
             # 池化影响在求prune_idx时已解决
             conv_sum=next_conv_weight.sum(dim=(2,3))
             offset = conv_sum.matmul(activation.reshape(-1, 1)).reshape(-1)  # outchannel
@@ -209,17 +212,17 @@ def prune_model_keep_size(cfg,model, prune_idx, CBL_idx, CBLidx2mask,Conv_idx):
                 activation = activate((1 - mask) * bn_bias)  # 先过激活，再过量化（如果有），（1-mask)--->被剪掉的为1---》为剪掉的为0，得保证0量化为0
             if isinstance(reg_conv,nn.Conv2d):
                 next_conv_weight = reg_conv.weight.data
-                # if cfg.QUANTIZATION.FINAL == True:
-                #     activation = quan_a(activation)
-                #     next_conv_weight = quan_w(next_conv_weight)
+                if cfg.QUANTIZATION.FINAL == True:
+                    activation = quan_a(activation)
+                    next_conv_weight = quan_w(next_conv_weight)
                 conv_sum = next_conv_weight.sum(dim=(2, 3))  # outchannel,inchannel
                 offset = conv_sum.matmul(activation.reshape(-1, 1)).reshape(-1)  # outchannel
                 reg_conv.bias.data.add_(offset)
             else:#ssdlite深度可分离
                 next_conv_weight = reg_conv.conv[0].weight.data  # 深度卷积
-                # if cfg.QUANTIZATION.FINAL == True:
-                #     activation = quan_a(activation)
-                #     next_conv_weight = quan_w(next_conv_weight)
+                if cfg.QUANTIZATION.FINAL == True:
+                    activation = quan_a(activation)
+                    next_conv_weight = quan_w(next_conv_weight)
                 conv_sum = next_conv_weight.sum(dim=(2, 3)).reshape(-1)  # outchannel
                 offset = conv_sum.matmul(activation.reshape(-1)).reshape(-1)  # outchannel
                 reg_conv.conv[1].running_mean.data.sub_(offset)
@@ -232,17 +235,17 @@ def prune_model_keep_size(cfg,model, prune_idx, CBL_idx, CBLidx2mask,Conv_idx):
                 activation = activate((1 - mask) * bn_bias)  # 先过激活，再过量化（如果有），（1-mask)--->被剪掉的为1---》为剪掉的为0，得保证0量化为0
             if isinstance(cls_conv,nn.Conv2d):#普通ssdlite
                 next_conv_weight = cls_conv.weight.data
-                # if cfg.QUANTIZATION.FINAL == True:
-                #     activation = quan_a(activation)
-                #     next_conv_weight = quan_w(next_conv_weight)
+                if cfg.QUANTIZATION.FINAL == True:
+                    activation = quan_a(activation)
+                    next_conv_weight = quan_w(next_conv_weight)
                 conv_sum = next_conv_weight.sum(dim=(2, 3))  # outchannel,inchannel
                 offset = conv_sum.matmul(activation.reshape(-1, 1)).reshape(-1)  # outchannel
                 cls_conv.bias.data.add_(offset)
             else:# ssdlite深度可分离
                 next_conv_weight = cls_conv.conv[0].weight.data
-                # if cfg.QUANTIZATION.FINAL == True:
-                #     activation = quan_a(activation)
-                #     next_conv_weight = quan_w(next_conv_weight)
+                if cfg.QUANTIZATION.FINAL == True:
+                    activation = quan_a(activation)
+                    next_conv_weight = quan_w(next_conv_weight)
                 conv_sum = next_conv_weight.sum(dim=(2, 3)).reshape(-1)  # outchannel
                 offset = conv_sum.matmul(activation.reshape(-1)).reshape(-1)  # outchannel
                 cls_conv.conv[1].running_mean.data.sub_(offset)

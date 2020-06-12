@@ -14,14 +14,21 @@ from ssd.utils.dist_util import synchronize
 from ssd.utils.logger import setup_logger
 
 
-def evaluation(cfg, ckpt, distributed):
+def evaluation(cfg, ckpt, distributed,model_path=None):
     logger = logging.getLogger("SSD.inference")
     model = build_detection_model(cfg)
     logger.info("Model :\n{}".format(model))#如果用print,多gpu会打印两便
     checkpointer = CheckPointer(model, save_dir=cfg.OUTPUT_DIR, logger=logger)
     device = torch.device(cfg.MODEL.DEVICE)
     model.to(device)
-    checkpointer.load(ckpt, use_latest=ckpt is None)
+    if model_path is None:
+        checkpointer.load(ckpt, use_latest=ckpt is None)
+    else:
+        model.load_state_dict(torch.load(model_path))
+    if cfg.TEST.BN_FUSE is True:
+        print('BN_FUSE.')
+        model.backbone.bn_fuse()
+        model.to(device)
     do_evaluation(cfg, model, distributed)
 
 
@@ -41,8 +48,13 @@ def main():
         default=None,
         type=str,
     )
+    parser.add_argument(
+        "--model_path",
+        help="The path to the model for test, only model",
+        default=None,
+        type=str,
+    )
 
-    parser.add_argument("--output_dir", default="eval_results", type=str, help="The directory to store evaluation results.")
 
     parser.add_argument(
         "opts",
@@ -82,7 +94,7 @@ def main():
         config_str = "\n" + cf.read()
         logger.info(config_str)
     logger.info("Running with config:\n{}".format(cfg))
-    evaluation(cfg, ckpt=args.ckpt, distributed=distributed)
+    evaluation(cfg, ckpt=args.ckpt, distributed=distributed,model_path=args.model_path)
 
 
 if __name__ == '__main__':

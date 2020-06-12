@@ -8,6 +8,37 @@ import torch.nn as nn
 import torch
 from ssd.modeling import registry
 import os
+import quantization.WqAq.dorefa.models.util_wqaq as dorefa
+import quantization.WqAq.IAO.models.util_wqaq as IAO
+import quantization.WbWtAb.models.util_wt_bab as BWN
+def fuse_conv_and_bn(conv, bn):
+    # https://tehnokv.com/posts/fusing-batchnorm-and-conv/
+    with torch.no_grad():
+        # init
+        fusedconv = torch.nn.Conv2d(conv.in_channels,
+                                    conv.out_channels,
+                                    kernel_size=conv.kernel_size,
+                                    stride=conv.stride,
+                                    padding=conv.padding,
+                                    dilation=conv.dilation,
+                                    groups=conv.groups,
+                                    bias=True)
+
+        # prepare filters
+        w_conv = conv.weight.clone().view(conv.out_channels, -1)
+        w_bn = torch.diag(bn.weight.div(torch.sqrt(bn.eps + bn.running_var)))
+        fusedconv.weight.copy_(torch.mm(w_bn, w_conv).view(fusedconv.weight.size()))
+
+        # prepare spatial bias
+        if conv.bias is not None:
+            b_conv = conv.bias
+        else:
+            b_conv = torch.zeros(conv.weight.size(0)).cuda()
+        b_bn = bn.bias - bn.weight.mul(bn.running_mean).div(torch.sqrt(bn.running_var + bn.eps))
+        fusedconv.bias.copy_(bn.weight.mul(b_conv).div(torch.sqrt(bn.running_var + bn.eps))+ b_bn)
+
+        return fusedconv
+
 class Swish(nn.Module):
     def __init__(self):
         super(Swish, self).__init__()
@@ -61,6 +92,24 @@ class SE(nn.Module):
 class Backbone(nn.Module):
     def __init__(self, cfg):
         super().__init__()
+        self.quan_type = cfg.QUANTIZATION.TYPE
+        if self.quan_type == 'dorefa':
+            self.quan_conv = dorefa.Conv2d_Q
+            self.wbits = cfg.QUANTIZATION.WBITS
+            self.abits = cfg.QUANTIZATION.ABITS
+        elif self.quan_type == 'IAO':
+            self.quan_conv_bn = IAO.BNFold_Conv2d_Q  # BN融合训练
+            self.quan_conv = IAO.Conv2d_Q
+            self.wbits = cfg.QUANTIZATION.WBITS
+            self.abits = cfg.QUANTIZATION.ABITS
+        elif self.quan_type =='BWN':
+            self.quan_conv = BWN.Conv2d_Q
+            self.wbits = cfg.QUANTIZATION.WBITS
+            self.abits = cfg.QUANTIZATION.ABITS
+            if self.abits!=2:  #这里2不表示2位，表示二值
+                print('激活未量化')
+            if self.wbits!=2 and self.wbits!=3:
+                print('权重未量化')
         self.module_defs = self.parse_model_cfg(cfg.MODEL.BACKBONE.CFG)
         self.module_list, self.l2_norm_index,self.features,self.l2_norm,self.routs= self.create_backbone(cfg,self.module_defs)
         self.reset_parameters()
@@ -86,6 +135,7 @@ class Backbone(nn.Module):
                     mdefs[-1]['feature'] = 'no'
                     mdefs[-1]['dilation'] = '1'
                     mdefs[-1]['bias'] = '1'
+                    mdefs[-1]['quantization'] = '0'
                 else:
                     mdefs[-1]['feature'] = 'no'
             else:
@@ -107,6 +157,7 @@ class Backbone(nn.Module):
             # print(mdef)
             if mdef['type'] == 'convolutional':
                 bn = int(mdef['batch_normalize'])
+                quantization = int(mdef['quantization'])
                 filters = int(mdef['filters'])
                 kernel_size = int(mdef['size'])
                 pad = int(mdef['pad'])
@@ -114,16 +165,57 @@ class Backbone(nn.Module):
                     bias=True
                 else:
                     bias=False
-
-                modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
-                                                       out_channels=filters,
-                                                       kernel_size=kernel_size,
-                                                       stride=int(mdef['stride']),
-                                                       padding=pad,
-                                                       dilation=int(mdef['dilation']),bias=bias))
-                if bn:
-                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
-
+                if quantization == 0:
+                    modules.add_module('Conv2d', nn.Conv2d(in_channels=output_filters[-1],
+                                                           out_channels=filters,
+                                                           kernel_size=kernel_size,
+                                                           stride=int(mdef['stride']),
+                                                           padding=pad,
+                                                           dilation=int(mdef['dilation']),bias=bias))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                elif self.quan_type=='dorefa':
+                    # print('Q')
+                    modules.add_module('Conv2d', self.quan_conv(in_channels=output_filters[-1],
+                                                           out_channels=filters,
+                                                           kernel_size=kernel_size,
+                                                           stride=int(mdef['stride']),
+                                                           padding=pad,
+                                                           dilation=int(mdef['dilation']),
+                                                           a_bits=self.abits,
+                                                           w_bits=self.wbits,bias=bias))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                elif self.quan_type=='IAO':
+                    if bn:
+                        modules.add_module('Conv2d', self.quan_conv_bn(in_channels=output_filters[-1],
+                                                           out_channels=filters,
+                                                           kernel_size=kernel_size,
+                                                           stride=int(mdef['stride']),
+                                                           padding=pad,
+                                                           dilation=int(mdef['dilation']),
+                                                           a_bits=self.abits,
+                                                           w_bits=self.wbits,bias=False))##BN_fold这一版默认没有bias  #默认对称量化  量化零点为0
+                    else:
+                        modules.add_module('Conv2d', self.quan_conv(in_channels=output_filters[-1],
+                                                                       out_channels=filters,
+                                                                       kernel_size=kernel_size,
+                                                                       stride=int(mdef['stride']),
+                                                                       padding=pad,
+                                                                       dilation=int(mdef['dilation']),
+                                                                       a_bits=self.abits,
+                                                                       w_bits=self.wbits,bias=bias))
+                elif self.quan_type=='BWN':
+                    modules.add_module('Conv2d', self.quan_conv(in_channels=output_filters[-1],
+                                                                out_channels=filters,
+                                                                kernel_size=kernel_size,
+                                                                stride=int(mdef['stride']),
+                                                                padding=pad,
+                                                                dilation=int(mdef['dilation']),
+                                                                A=self.abits,
+                                                                W=self.wbits, bias=bias))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
                 if mdef['activation'] == 'leaky':
                     modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
@@ -138,20 +230,68 @@ class Backbone(nn.Module):
                 filters = int(mdef['filters'])
                 kernel_size = int(mdef['size'])
                 pad = int(mdef['pad'])
+                quantization = int(mdef['quantization'])
                 if mdef['bias'] == '1':
                     bias = True
                 else:
                     bias = False
+                if quantization == 0:
+                    modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
+                                                                out_channels=filters,
+                                                                kernel_size=kernel_size,
+                                                                stride=int(mdef['stride']),
+                                                                padding=pad,
+                                                                groups=output_filters[-1],
+                                                                dilation=int(mdef['dilation']), bias=bias))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                elif self.quan_type=='dorefa':
+                    # print('Q')
+                    modules.add_module('DepthWise2d', self.quan_conv(in_channels=output_filters[-1],
+                                                           out_channels=filters,
+                                                           kernel_size=kernel_size,
+                                                           stride=int(mdef['stride']),
+                                                           padding=pad,
+                                                           dilation=int(mdef['dilation']),
+                                                           groups=output_filters[-1],
+                                                           a_bits=self.abits,
+                                                           w_bits=self.wbits,bias=bias))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
+                elif self.quan_type=='IAO':
+                    if bn:
+                        modules.add_module('Conv2d', self.quan_conv_bn(in_channels=output_filters[-1],
+                                                           out_channels=filters,
+                                                           kernel_size=kernel_size,
+                                                           stride=int(mdef['stride']),
+                                                           padding=pad,
+                                                           dilation=int(mdef['dilation']),
+                                                           groups=output_filters[-1],
+                                                           a_bits=self.abits,
+                                                           w_bits=self.wbits,bias=False))##BN_fold这一版默认没有bias  #默认对称量化  量化零点为0
+                    else:
+                        modules.add_module('Conv2d', self.quan_conv(in_channels=output_filters[-1],
+                                                                       out_channels=filters,
+                                                                       kernel_size=kernel_size,
+                                                                       stride=int(mdef['stride']),
+                                                                       padding=pad,
+                                                                       groups=output_filters[-1],
+                                                                       dilation=int(mdef['dilation']),
+                                                                       a_bits=self.abits,
+                                                                       w_bits=self.wbits,bias=bias))
+                elif self.quan_type=='BWN':
+                    modules.add_module('Conv2d', self.quan_conv(in_channels=output_filters[-1],
+                                                                out_channels=filters,
+                                                                kernel_size=kernel_size,
+                                                                stride=int(mdef['stride']),
+                                                                padding=pad,
+                                                                dilation=int(mdef['dilation']),
+                                                                groups=output_filters[-1],
+                                                                A=self.abits,
+                                                                W=self.wbits, bias=bias))
+                    if bn:
+                        modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
-                modules.add_module('DepthWise2d', nn.Conv2d(in_channels=output_filters[-1],
-                                                       out_channels=filters,
-                                                       kernel_size=kernel_size,
-                                                       stride=int(mdef['stride']),
-                                                       padding=pad,
-                                                       groups=output_filters[-1],
-                                                       dilation=int(mdef['dilation']), bias=bias))
-                if bn:
-                    modules.add_module('BatchNorm2d', nn.BatchNorm2d(filters, momentum=0.1))
 
                 if mdef['activation'] == 'leaky':
                     modules.add_module('activation', nn.LeakyReLU(0.1, inplace=True))
@@ -161,7 +301,7 @@ class Backbone(nn.Module):
                     modules.add_module('activation', relu6())
                 elif mdef['activation'] == 'h_swish':
                     modules.add_module('activation', h_swish())
-
+                #不能加else  会影响linear不激活
 
             elif mdef['type'] == 'shortcut':  # nn.Sequential() placeholder for 'shortcut' layer
                 layer = int(mdef['from'])
@@ -213,6 +353,27 @@ class Backbone(nn.Module):
                     feature=self.l2_norm(x)
                     features.append(feature)
         return tuple(features)
+    def bn_fuse(self):
+        #dilation应该不影响bn融合
+        # Fuse Conv2d + BatchNorm2d layers throughout model     BN融合
+        fused_list = nn.ModuleList()
+        # print(list(self.children())[0])#module_list
+        for a in list(self.children())[0]:
+            # print(a)
+            if isinstance(a, nn.Sequential):
+                for i, b in enumerate(a):
+                    if isinstance(b, nn.modules.batchnorm.BatchNorm2d):
+                        # print(1)
+                        # # fuse this bn layer with the previous conv2d layer
+                        # print(a[i-1])
+                        # print(b)
+                        # print(*list(a.children())[i + 1:])
+                        conv = a[i - 1]
+                        fused = fuse_conv_and_bn(conv, b)
+                        a = nn.Sequential(fused, *list(a.children())[i + 1:])
+                        break
+            fused_list.append(a)
+        self.module_list = fused_list
 @registry.BACKBONES.register('cfg_backbone')
 def cfg_backbone(cfg, pretrained=True):
     model = Backbone(cfg)
@@ -231,18 +392,30 @@ def cfg_backbone(cfg, pretrained=True):
                     num = num + 1
                     if conv_layer.bias is not None:
                         conv_layer.bias.data.copy_(state[name_list[num]])
-                        num = num + 1
+                    ##可能之前的全精度权重有bias,IAO没有
+                    if mdef['bias']=='1':
+                        num=num+1
                     if mdef['batch_normalize'] == '1':
-                        # Load BN bias, weights, running mean and running variance
-                        bn_layer = module[1]
-                        bn_layer.weight.data.copy_(state[name_list[num]])
-                        num = num + 1
-                        bn_layer.bias.data.copy_(state[name_list[num]])
-                        num = num + 1
-                        bn_layer.running_mean.data.copy_(state[name_list[num]])
-                        num = num + 1
-                        bn_layer.running_var.data.copy_(state[name_list[num]])
-                        num = num + 2  # 跳过num_batches_tracked
+                        if isinstance(conv_layer, IAO.BNFold_Conv2d_Q):  # iIAO bn
+                            conv_layer.gamma.data.copy_(state[name_list[num]])
+                            num = num + 1
+                            conv_layer.beta.data.copy_(state[name_list[num]])
+                            num = num + 1
+                            conv_layer.running_mean.data.copy_(state[name_list[num]])
+                            num = num + 1
+                            conv_layer.running_var.data.copy_(state[name_list[num]])
+                            num = num + 2  # 跳过num_batches_tracked
+                        else:
+                            # Load BN bias, weights, running mean and running variance
+                            bn_layer = module[1]
+                            bn_layer.weight.data.copy_(state[name_list[num]])
+                            num = num + 1
+                            bn_layer.bias.data.copy_(state[name_list[num]])
+                            num = num + 1
+                            bn_layer.running_mean.data.copy_(state[name_list[num]])
+                            num = num + 1
+                            bn_layer.running_var.data.copy_(state[name_list[num]])
+                            num = num + 2  # 跳过num_batches_tracked
         else:#加载在分类数据集（imagenet)上的权重，只加载reduce_fc的部分
             name_list = list(state.keys())
             num = 0
