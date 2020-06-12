@@ -1,4 +1,4 @@
-# Pruning and quantification
+# Pruning and quantization
 下面的实验均在oxfordhand数据集上进行;Pruning后均未微调。
 
 
