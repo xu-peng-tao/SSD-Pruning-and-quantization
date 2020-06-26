@@ -33,6 +33,10 @@ def run_demo(cfg, ckpt, score_threshold, images_dir, output_dir, dataset_type,mo
     model = model.to(device)
     checkpointer = CheckPointer(model, save_dir=cfg.OUTPUT_DIR)
     checkpointer.load(ckpt, use_latest=ckpt is None)
+    ##
+    # model.backbone.bn_fuse()#需要修改demo.py   要bn_fuse   因为fpga端没有bn
+    # model.to(device)
+    # ##
     if model_path is None:
         checkpointer.load(ckpt, use_latest=ckpt is None)
         weight_file = ckpt if ckpt else checkpointer.get_checkpoint_file()

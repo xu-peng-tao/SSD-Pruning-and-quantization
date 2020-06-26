@@ -343,6 +343,36 @@ class Backbone(nn.Module):
             mtype = mdef['type']
             if mtype in ['convolutional', 'depthwise', 'se', 'upsample', 'maxpool']:
                 x = module(x)
+                # #打印中间输出
+                # import numpy as np
+                # import sys
+                # np.set_printoptions(threshold=sys.maxsize)  # 全部输出,无省略号
+                # np.set_printoptions(suppress=True)  # 不用指数e
+                # print(x.shape)
+                # # print(x.cpu().numpy())
+                # np.savetxt(f'fpga/{i}_{x.shape}.txt', x.flatten().cpu().numpy())
+                #
+                # #模拟fpga量化特征值
+                # # 给你一个weight.txt和bias.txt的float型数据
+                # # 跑你现在的ssd网络，针对每一层的输出特征，进行量化（找到这一层的最大值（因为是relu，所以最小值可以不管）之后最大值如果是56，可以用2 ^ 6
+                # # 表示，那么这一层的数同时乘以再除以2 ^ 9（此处用short型或者int16型，之后传到下一层））
+                # max=torch.max(x)
+                # # print(max)
+                # for bit in range(15):#16bit量化   符号位占一位
+                #     if max<pow(2,bit):
+                #         zhengshu=bit#整数部分用几位
+                #         break
+                # xiaoshu=15-zhengshu
+                # # print(xiaoshu)
+                # # print((x*torch.tensor([pow(2,xiaoshu)]).cuda()).int().float())
+                # x=(x*torch.tensor([pow(2,xiaoshu)]).cuda()).int().float()/torch.tensor([pow(2,xiaoshu)]).cuda()
+                # # print(x_copy-x)
+                #
+                # print('max:')
+                # print(torch.max(x))
+
+                #########
+
             elif mtype == 'shortcut':
                 x = x + layer_outputs[int(mdef['from'])]
             layer_outputs.append(x if i in self.routs else [])
