@@ -112,7 +112,7 @@ class weight_tnn_bin(nn.Module):
             output_abs_th = output_abs.clone()
             output_abs_th_sum = torch.sum(output_abs_th, (3, 2, 1), keepdim=True)
             mask_gt_sum = torch.sum(mask_gt, (3, 2, 1), keepdim=True).float()
-            alpha = output_abs_th_sum / mask_gt_sum # α(缩放因子)
+            alpha = output_abs_th_sum / mask_gt_sum # α(缩放因子)   大于阙值的平均值          大于阙值的值/大于阙值的个数
             # *************** W * α ****************
             output = output * alpha # 若不需要α(缩放因子)，注释掉即可
     else:

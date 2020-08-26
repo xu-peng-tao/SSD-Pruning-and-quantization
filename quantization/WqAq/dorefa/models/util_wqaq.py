@@ -56,12 +56,12 @@ class weight_quantize(nn.Module):
       assert self.w_bits != 1                      
     else:
       output = torch.tanh(input)
-      output = output / 2 / torch.max(torch.abs(output)) + 0.5  #归一化-[0,1]
+      output = output / 2 / torch.max(torch.abs(output)) + 0.5  #[-1,1]归一化-[0,1]
       scale = float(2 ** self.w_bits - 1)
       output = output * scale
       output = self.round(output)
       output = output / scale
-      output = 2 * output - 1
+      output = 2 * output - 1 #[-1,1]
     return output
 
 # ********************* 量化卷积（同时量化A/W，并做卷积） ***********************

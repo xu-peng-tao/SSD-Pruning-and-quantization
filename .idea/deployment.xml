@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
-  <component name="PublishConfigData" serverName="xpt@162.105.183.18:22">
+  <component name="PublishConfigData" autoUpload="Always" serverName="xpt@162.105.183.22:22">
     <serverData>
       <paths name="xpt@162.105.183.18:22">
         <serverdata>
@@ -23,6 +23,14 @@
           </mappings>
         </serverdata>
       </paths>
+      <paths name="xpt@162.105.183.22:22">
+        <serverdata>
+          <mappings>
+            <mapping deploy="/home/xpt/SSD" local="$PROJECT_DIR$" />
+          </mappings>
+        </serverdata>
+      </paths>
     </serverData>
+    <option name="myAutoUpload" value="ALWAYS" />
   </component>
 </project>

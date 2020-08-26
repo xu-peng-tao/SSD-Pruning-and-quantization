@@ -37,3 +37,4 @@ OUTPUT_DIR: 'outputs/mini_ssd_hand_fpga'
 #python get_weights.py --config-file configs/mini_ssd_hand_fpga.yaml --ckpt model_final.pth TEST.BN_FUSE True
 #python fpga_weights.py --config-file configs/mini_ssd_hand_fpga.yaml
 #CUDA_VISIBLE_DEVICES="3" python demo.py --config-file configs/mini_ssd_hand_fpga.yaml --images_dir demo --model_path fpga/test.pth --dataset_type oxfordhand --score_threshold 0.24
+#python caculate_FLOPs.py --config-file configs/mini_ssd_hand_fpga.yaml --in_size 416

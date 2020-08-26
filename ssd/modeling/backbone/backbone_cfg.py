@@ -342,7 +342,7 @@ class Backbone(nn.Module):
         for i, (mdef, module) in enumerate(zip(self.module_defs, self.module_list)):
             mtype = mdef['type']
             if mtype in ['convolutional', 'depthwise', 'se', 'upsample', 'maxpool']:
-                x = module(x)
+                x = module(x)#过卷积、激活
                 # #打印中间输出
                 # import numpy as np
                 # import sys

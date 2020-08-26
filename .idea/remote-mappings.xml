@@ -10,6 +10,13 @@
             </list>
           </settings>
         </remote-mappings>
+        <remote-mappings server-id="python@sftp://xpt@162.105.183.22:22/home/xpt/anaconda3/envs/pytorch/bin/python">
+          <settings>
+            <list>
+              <mapping local-root="$PROJECT_DIR$" remote-root="/home/xpt/SSD" />
+            </list>
+          </settings>
+        </remote-mappings>
       </list>
     </list>
   </component>

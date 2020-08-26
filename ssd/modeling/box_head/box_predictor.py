@@ -1,6 +1,6 @@
 import torch
 from torch import nn
-
+import numpy as np
 from ssd.layers import SeparableConv2d
 from ssd.modeling import registry
 import quantization.WqAq.dorefa.models.util_wqaq as dorefa
@@ -47,6 +47,15 @@ class BoxPredictor(nn.Module):
         cls_logits = []
         bbox_pred = []
         for feature, cls_header, reg_header in zip(features, self.cls_headers, self.reg_headers):
+            # print(feature.shape)
+            # 保存后处理前的结果
+            # print(cls_header(feature).permute(0, 2, 3, 1).shape)
+            # print(reg_header(feature).permute(0, 2, 3, 1).shape)
+            # np.savetxt('fpga/cls_header.txt', cls_header(feature).permute(0, 2, 3, 1).flatten().cpu().numpy(), fmt="%f", delimiter=" ")
+            # np.savetxt('fpga/reg_header.txt', reg_header(feature).permute(0, 2, 3, 1).flatten().cpu().numpy(),
+            #            fmt="%f", delimiter=" ")
+
+
             cls_logits.append(cls_header(feature).permute(0, 2, 3, 1).contiguous())
             bbox_pred.append(reg_header(feature).permute(0, 2, 3, 1).contiguous())
 

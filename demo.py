@@ -61,6 +61,19 @@ def run_demo(cfg, ckpt, score_threshold, images_dir, output_dir, dataset_type,mo
         image = np.array(Image.open(image_path).convert("RGB"))
         height, width = image.shape[:2]
         images = transforms(image)[0].unsqueeze(0)
+
+
+        # print(images)
+        # print(images.shape)
+        # import sys
+        # np.set_printoptions(threshold=sys.maxsize)  # 全部输出,无省略号
+        # np.set_printoptions(suppress=True)  # 不用指数e
+        # np.savetxt('fpga/pic.txt',images.flatten().cpu().numpy())
+        # # print(images)
+        # # print(images/255.0)
+        # # print(images)  #没有归一化的整数
+
+
         load_time = time.time() - start
 
         start = time.time()
